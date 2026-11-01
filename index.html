@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="ja" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>saisoku-area // 最速出身地特定</title>
+    
+    <!-- Fonts: JetBrains Mono & Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&family=JetBrains+Mono:wght@400;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Canvas Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        mono: ['"JetBrains Mono"', 'monospace'],
+                        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#f0fdf4',
+                            500: '#22c55e',
+                            900: '#14532d',
+                        },
+                        dark: {
+                            bg: '#090d16',
+                            card: '#0f172a',
+                            border: '#1e293b',
+                            accent: '#38bdf8'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background-color: #080c14;
+            color: #f1f5f9;
+            font-family: 'Inter', sans-serif;
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .terminal-border {
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+        }
+
+        .terminal-border:hover {
+            border-color: rgba(56, 189, 248, 0.3);
+        }
+
+        #earthCanvas {
+            position: fixed;
+            inset: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 0;
+            pointer-events: none;
+            opacity: 0.25;
+            transition: opacity 1s cubic-bezier(0.16, 1, 0.3, 1), transform 1s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        #earthCanvas.active {
+            opacity: 0.85;
+        }
+
+        .btn-option {
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid #1e293b;
+            transition: all 0.12s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .btn-option:hover {
+            background: rgba(30, 41, 59, 0.9);
+            border-color: #38bdf8;
+            transform: translateY(-1px);
+        }
+
+        .btn-option:active {
+            transform: translateY(1px);
+        }
+
+        /* Scanline effect */
+        .scanline {
+            background: linear-gradient(
+                to bottom,
+                rgba(255,255,255,0),
+                rgba(255,255,255,0) 50%,
+                rgba(0, 0, 0, 0.3) 50%,
+                rgba(0, 0, 0, 0.3)
+            );
+            background-size: 100% 4px;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between items-center relative p-4 selection:bg-sky-500 selection:text-slate-950">
+
+    <!-- Canvas Background (Three.js Earth) -->
+    <canvas id="earthCanvas"></canvas>
+
+    <!-- Header / Navbar -->
+    <header class="w-full max-w-2xl z-10 flex justify-between items-center py-4 border-b border-slate-800/80">
+        <div class="flex items-center space-x-2 font-mono text-xs">
+            <span class="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span class="text-slate-400">saisoku-area</span>
+            <span class="text-slate-600">/</span>
+            <span class="text-slate-300">v2.4.0</span>
+        </div>
+
+        <div id="liveTimer" class="hidden font-mono text-xs text-sky-400 bg-sky-950/40 px-2.5 py-1 rounded border border-sky-800/50">
+            00:00.00
+        </div>
+    </header>
+
+    <!-- Main App Container -->
+    <main class="w-full max-w-xl z-10 my-auto py-8">
+
+        <!-- STEP 0: START CARD (Super Minimal, Clean) -->
+        <div id="cardStart" class="terminal-border bg-slate-900/90 backdrop-blur-xl p-8 rounded-2xl space-y-6">
+            <div class="space-y-2">
+                <div class="font-mono text-xs text-sky-400 tracking-wider">Fastest Origin Guessing Engine</div>
+                <h1 class="text-3xl sm:text-4xl font-black tracking-tight text-white font-mono">
+                    saisoku_area<span class="text-sky-400">.exe</span>
+                </h1>
+                <p class="text-slate-400 text-sm leading-relaxed">
+                    質問への回答＋バックグラウンドネットワーク特性解析から、あなたの出身市区町村を最速で特定します。
+                </p>
+            </div>
+
+            <div class="pt-2">
+                <button id="btnStart" class="w-full font-mono text-sm font-bold py-4 px-6 rounded-xl bg-slate-100 hover:bg-white text-slate-950 hover:shadow-lg hover:shadow-sky-500/10 active:scale-[0.99] transition-all flex items-center justify-center space-x-2 group">
+                    <span>EXECUTE_SPECIFICATION</span>
+                    <i data-lucide="arrow-right" class="w-4 h-4 group-hover:translate-x-1 transition-transform"></i>
+                </button>
+            </div>
+
+            <div class="flex items-center justify-between text-[11px] font-mono text-slate-500 border-t border-slate-800/80 pt-4">
+                <span>[ENTER] to start</span>
+                <span>Binary Decision Trees</span>
+            </div>
+        </div>
+
+        <!-- STEP 1: QUESTION CARD -->
+        <div id="cardQuestion" class="hidden terminal-border bg-slate-900/90 backdrop-blur-xl p-6 sm:p-8 rounded-2xl space-y-6">
+            <!-- Progress Bar -->
+            <div class="space-y-1.5">
+                <div class="flex justify-between items-center text-xs font-mono">
+                    <span id="stepCounter" class="text-sky-400">Q.1 / 4</span>
+                    <span id="stepScope" class="text-slate-400 text-[11px]">AREA_REDUCTION</span>
+                </div>
+                <div class="w-full h-1 bg-slate-800 rounded-full overflow-hidden">
+                    <div id="stepProgress" class="h-full bg-sky-400 transition-all duration-200" style="width: 25%;"></div>
+                </div>
+            </div>
+
+            <!-- Question Text -->
+            <div class="py-2">
+                <h2 id="questionTitle" class="text-lg sm:text-xl font-bold text-slate-100 leading-snug">
+                    質問を取得しています...
+                </h2>
+            </div>
+
+            <!-- Options Grid -->
+            <div id="optionsWrapper" class="grid grid-cols-1 gap-2.5 pt-2">
+                <!-- Injected via JS -->
+            </div>
+        </div>
+
+        <!-- STEP 2: RESULT CARD -->
+        <div id="cardResult" class="hidden terminal-border bg-slate-900/95 backdrop-blur-2xl p-8 rounded-2xl text-center space-y-6">
+            <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-mono">
+                <i data-lucide="check-circle-2" class="w-3.5 h-3.5"></i>
+                <span>SPECIFICATION COMPLETE</span>
+            </div>
+
+            <div class="space-y-2 py-2">
+                <div class="text-xs font-mono text-slate-400 tracking-wider">推定されたあなたの出身市区町村</div>
+                <div id="resultCity" class="text-4xl sm:text-5xl font-black text-white tracking-tight font-mono glow-text">
+                    ---
+                </div>
+                <div id="resultPref" class="text-xs font-mono text-sky-400">
+                    ---
+                </div>
+            </div>
+
+            <!-- Meta Data Specs -->
+            <div class="bg-slate-950/80 rounded-xl p-4 border border-slate-800 text-left font-mono text-xs space-y-2 text-slate-400">
+                <div class="flex justify-between border-b border-slate-800/60 pb-1.5">
+                    <span>所要時間 (Elapsed):</span>
+                    <span id="resTime" class="text-slate-200 font-bold">00:00.00</span>
+                </div>
+                <div class="flex justify-between border-b border-slate-800/60 pb-1.5">
+                    <span>ネットワーク起点 (IP Node):</span>
+                    <span id="resIp" class="text-slate-200">127.0.0.1</span>
+                </div>
+                <div class="flex justify-between">
+                    <span>推定プロバイダ (ISP):</span>
+                    <span id="resIsp" class="text-slate-200 truncate max-w-[180px]">Localhost</span>
+                </div>
+            </div>
+
+            <!-- Share Buttons -->
+            <div class="pt-2 space-y-2">
+                <button id="btnShare" class="w-full font-mono text-xs font-bold py-3.5 px-4 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 transition-all flex items-center justify-center space-x-2">
+                    <i data-lucide="twitter" class="w-4 h-4"></i>
+                    <span>X (Twitter) で結果をポスト</span>
+                </button>
+                <button id="btnRetry" class="w-full font-mono text-xs font-medium py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition-all">
+                    RE-EXECUTE (もう一度診断)
+                </button>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="w-full max-w-2xl z-10 py-4 flex justify-between items-center border-t border-slate-800/80 font-mono text-[11px] text-slate-500">
+        <div>saisoku_area &copy; 2026</div>
+        <div class="flex space-x-4">
+            <span class="hover:text-slate-400 cursor-pointer">github</span>
+            <span class="hover:text-slate-400 cursor-pointer">api</span>
+        </div>
+    </footer>
+
+    <!-- Simulated PHP Backend + Frontend JS -->
+    <script>
+        /* 
+           Simulated PHP API Handler for pure client-side hosting.
+           In a real PHP environment, this logic would execute via index.php endpoint.
+        */
+        const MockPHPBackend = {
+            // Emulates: geolocation_lookup.php
+            async getClientGeo() {
+                try {
+                    const res = await fetch('https://ipapi.co/json/');
+                    if (res.ok) {
+                        const data = await res.json();
+                        return {
+                            ip: data.ip || '126.255.18.90',
+                            region: data.region || '東京都',
+                            city: data.city || 'Tokyo',
+                            isp: data.org || 'NTT DOCOMO'
+                        };
+                    }
+                } catch (e) {
+                    // Fallback mock payload
+                }
+                return {
+                    ip: '133.203.19.4',
+                    region: '東京都',
+                    city: 'Tokyo',
+                    isp: 'KDDI Corporation'
+                };
+            }
+        };
+
+        // Area dataset for binary tree filtering
+        const MUNICIPAL_DATA = {
+            "東京都": ["新宿区/渋谷区", "千代田区/中央区", "世田谷区/杉並区", "八王子市/立川市", "町田市/調波エリア"],
+            "神奈川県": ["横浜市中区/西区", "横浜市北部", "川崎市", "藤沢市/茅ヶ崎市(湘南)", "相模原市"],
+            "大阪府": ["大阪市北区/中央区", "大阪市淀川区/東淀川区", "堺市", "豊中市/吹田市(北摂)", "東大阪市/八尾市"],
+            "愛知県": ["名古屋市中区/中村区", "名古屋市千種区/名東区", "豊田市/岡崎市", "一宮市/春日井市", "豊橋市"],
+            "福岡県": ["福岡市博多区/中央区", "福岡市東区/西区", "北九州市", "久留米市", "飯塚市/筑豊エリア"],
+            "北海道": ["札幌市中央区", "札幌市北区/東区", "旭川市", "函館市", "帯広市/釧路市"],
+            "DEFAULT": ["中心市街地 / 県庁所在地", "政令都市主要エリア", "近郊ベッドタウン", "沿岸・港町エリア", "内陸・山間部エリア"]
+        };
+
+        const QUESTIONS = [
+            { id: 'metropolis', title: '居住地・出身地は「政令指定都市・23区などの大都市」ですか？' },
+            { id: 'station_dist', title: '最寄りの特急・主要駅から電車で15分圏内ですか？' },
+            { id: 'coastal', title: '海沿い・港・河口近くの地域ですか？' },
+            { id: 'direction_name', title: '市区町村名に東西南北などの方角漢字が入っていますか？' }
+        ];
+
+        // State variables
+        let currentStep = 0;
+        let startTime = 0;
+        let timerTimer = null;
+        let geoInfo = null;
+
+        // Sound Feedback Generator (Web Audio API)
+        const sound = (freq = 600, type = 'sine', duration = 0.05) => {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, ctx.currentTime);
+                gain.gain.setValueAtTime(0.05, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + duration);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start();
+                osc.stop(ctx.currentTime + duration);
+            } catch(e) {}
+        };
+
+        // App Controller Logic
+        const App = {
+            async init() {
+                // Background geo fetch with no loader
+                geoInfo = await MockPHPBackend.getClientGeo();
+            },
+
+            start() {
+                sound(800, 'sine', 0.08);
+                document.getElementById('cardStart').classList.add('hidden');
+                document.getElementById('cardQuestion').classList.remove('hidden');
+                document.getElementById('liveTimer').classList.remove('hidden');
+                
+                startTime = performance.now();
+                timerTimer = setInterval(() => {
+                    const elapsed = performance.now() - startTime;
+                    const sec = Math.floor(elapsed / 1000);
+                    const ms = Math.floor((elapsed % 1000) / 10);
+                    document.getElementById('liveTimer').innerText = 
+                        `${String(sec).padStart(2, '0')}:${String(ms).padStart(2, '0')}`;
+                }, 30);
+
+                currentStep = 0;
+                this.renderStep();
+            },
+
+            renderStep() {
+                if (currentStep >= QUESTIONS.length) {
+                    this.finish();
+                    return;
+                }
+
+                const q = QUESTIONS[currentStep];
+                document.getElementById('stepCounter').innerText = `Q.${currentStep + 1} / ${QUESTIONS.length}`;
+                document.getElementById('stepProgress').style.width = `${((currentStep + 1) / QUESTIONS.length) * 100}%`;
+                document.getElementById('questionTitle').innerText = q.title;
+
+                const wrapper = document.getElementById('optionsWrapper');
+                wrapper.innerHTML = '';
+
+                const opts = [
+                    { text: 'はい (YES)', val: true },
+                    { text: 'いいえ (NO)', val: false }
+                ];
+
+                opts.forEach((opt, idx) => {
+                    const btn = document.createElement('button');
+                    btn.className = 'btn-option w-full py-3.5 px-5 rounded-xl font-mono text-xs font-bold text-slate-200 flex justify-between items-center group';
+                    btn.innerHTML = `
+                        <span>${opt.text}</span>
+                        <span class="text-slate-500 group-hover:text-sky-400 transition-colors">[Key ${idx + 1}]</span>
+                    `;
+                    btn.onclick = () => {
+                        sound(600 + currentStep * 100, 'sine', 0.04);
+                        currentStep++;
+                        this.renderStep();
+                    };
+                    wrapper.appendChild(btn);
+                });
+            },
+
+            finish() {
+                clearInterval(timerTimer);
+                sound(1000, 'triangle', 0.2);
+
+                const elapsed = ((performance.now() - startTime) / 1000).toFixed(2);
+                
+                document.getElementById('cardQuestion').classList.add('hidden');
+                document.getElementById('cardResult').classList.remove('hidden');
+
+                // Determine guessed city
+                const candidates = MUNICIPAL_DATA[geoInfo.region] || MUNICIPAL_DATA["DEFAULT"];
+                const resultCity = candidates[Math.floor(Math.random() * candidates.length)];
+
+                document.getElementById('resultCity').innerText = resultCity;
+                document.getElementById('resultPref').innerText = `${geoInfo.region} NODE SPECIFIED`;
+                document.getElementById('resTime').innerText = `${elapsed}s`;
+                document.getElementById('resIp').innerText = geoInfo.ip;
+                document.getElementById('resIsp').innerText = geoInfo.isp;
+
+                // Trigger 3D Earth Focus
+                if (window.triggerEarthZoom) window.triggerEarthZoom();
+
+                // Trigger Confetti
+                if (typeof confetti === 'function') {
+                    confetti({
+                        particleCount: 80,
+                        spread: 60,
+                        origin: { y: 0.6 },
+                        colors: ['#38bdf8', '#22c55e', '#f1f5f9']
+                    });
+                }
+            }
+        };
+
+        // Keyboard Shortcuts ([ENTER], [1], [2])
+        window.addEventListener('keydown', (e) => {
+            if (!document.getElementById('cardStart').classList.contains('hidden')) {
+                if (e.key === 'Enter') App.start();
+            } else if (!document.getElementById('cardQuestion').classList.contains('hidden')) {
+                if (e.key === '1') {
+                    sound(600, 'sine', 0.04);
+                    currentStep++;
+                    App.renderStep();
+                } else if (e.key === '2') {
+                    sound(600, 'sine', 0.04);
+                    currentStep++;
+                    App.renderStep();
+                }
+            }
+        });
+
+        document.getElementById('btnStart').onclick = () => App.start();
+        document.getElementById('btnRetry').onclick = () => location.reload();
+        document.getElementById('btnShare').onclick = () => {
+            const city = document.getElementById('resultCity').innerText;
+            const time = document.getElementById('resTime').innerText;
+            const tweet = `【最速出身地特定】私の出身・居住市区町村は「${city}」と特定されました。(所要時間: ${time})\nhttps://saisoku-area.github.io\n#saisoku_area #最速出身地特定`;
+            window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(tweet)}`, '_blank');
+        };
+
+        // --- Lightweight Three.js Earth Background ---
+        window.onload = () => {
+            App.init();
+
+            const canvas = document.getElementById('earthCanvas');
+            const scene = new THREE.Scene();
+            const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.z = 2.5;
+
+            const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+            // Particle Earth
+            const count = 1800;
+            const positions = new Float32Array(count * 3);
+            const radius = 1.2;
+
+            for (let i = 0; i < count; i++) {
+                const phi = Math.acos(-1 + (2 * i) / count);
+                const theta = Math.sqrt(count * Math.PI) * phi;
+                positions[i * 3] = radius * Math.cos(theta) * Math.sin(phi);
+                positions[i * 3 + 1] = radius * Math.sin(theta) * Math.sin(phi);
+                positions[i * 3 + 2] = radius * Math.cos(phi);
+            }
+
+            const geom = new THREE.BufferGeometry();
+            geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            
+            const mat = new THREE.PointsMaterial({
+                color: 0x38bdf8,
+                size: 0.015,
+                transparent: true,
+                opacity: 0.8
+            });
+
+            const points = new THREE.Points(geom, mat);
+            scene.add(points);
+
+            let targetZ = 2.5;
+            window.triggerEarthZoom = () => {
+                canvas.classList.add('active');
+                targetZ = 1.8;
+            };
+
+            const animate = () => {
+                requestAnimationFrame(animate);
+                points.rotation.y += 0.002;
+                points.rotation.x += 0.0005;
+                camera.position.z += (targetZ - camera.position.z) * 0.05;
+                renderer.render(scene, camera);
+            };
+
+            animate();
+
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+
+            lucide.createIcons();
+        };
+    </script>
+</body>
+</html>
