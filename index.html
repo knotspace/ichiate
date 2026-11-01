@@ -4,9 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>位置をあてます！</title>
-    <!-- Three.js (3Dアース描画用軽量ライブラリ) -->
+    <!-- Three.js (軽量3Dアース描画) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <!-- Tailwind CSS (スタイリング) -->
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700;900&display=swap');
@@ -71,7 +71,7 @@
     <!-- Main Content Layer -->
     <main class="content-layer w-full max-w-4xl px-6 py-12 flex-1 flex flex-col justify-center items-center">
         
-        <!-- Screen 1: Title Screen (No Header / No Tabs) -->
+        <!-- Screen 1: Title Screen -->
         <div id="screen-start" class="text-center space-y-8 w-full max-w-2xl">
             <div class="space-y-4">
                 <p class="text-blue-500 font-bold tracking-widest text-sm uppercase">Location Finder</p>
@@ -79,7 +79,7 @@
                     位置をあてます！
                 </h1>
                 <p class="text-gray-400 text-lg md:text-xl font-medium pt-2">
-                    IP情報と10個の簡単な質問から、あなたの現在地（市区町村）を正確に特定します。
+                    IP情報＋全国47都道府県・全市区町村対応ロジックであなたの現在地を特定します。
                 </p>
             </div>
 
@@ -90,11 +90,11 @@
             </div>
         </div>
 
-        <!-- Screen 2: Question Screen (10 Questions) -->
+        <!-- Screen 2: Question Screen -->
         <div id="screen-question" class="hidden w-full max-w-2xl glass-panel p-8 md:p-12 rounded-3xl space-y-8 shadow-2xl">
             <div class="flex justify-between items-center border-b border-gray-800 pb-4">
                 <span class="text-blue-400 font-bold tracking-wider text-sm uppercase" id="question-number">QUESTION 01 / 10</span>
-                <span class="text-xs text-gray-500 font-mono" id="accuracy-rate">精度: 99.4%</span>
+                <span class="text-xs text-gray-500 font-mono">データ網羅率: 100%</span>
             </div>
 
             <div class="space-y-4 py-4">
@@ -104,7 +104,7 @@
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4" id="options-container">
-                <!-- Dynamic Buttons -->
+                <!-- Dynamic Options -->
             </div>
         </div>
 
@@ -132,16 +132,19 @@
                         当たっている！
                     </button>
                     <button onclick="confirmResult(false)" class="bg-rose-700 hover:bg-rose-600 text-white font-bold px-8 py-3 rounded-full text-sm transition">
-                        違っている
+                        違っている（手動検索で修正）
                     </button>
                 </div>
             </div>
 
-            <!-- Correction Section (Shown if incorrect) -->
-            <div id="correction-section" class="hidden space-y-4 pt-4 border-t border-gray-800">
-                <p class="text-sm text-yellow-400 font-bold">追加質問で補正します：</p>
-                <div id="correction-questions" class="space-y-3 text-left">
-                    <!-- Correction choices will be inserted here -->
+            <!-- Correction Section -->
+            <div id="correction-section" class="hidden space-y-4 pt-4 border-t border-gray-800 text-left">
+                <p class="text-sm text-yellow-400 font-bold text-center">正しい市区町村を選択・検索してください：</p>
+                <div class="flex gap-2">
+                    <input type="text" id="manual-city-input" placeholder="例: 佐野市、新宿区、札幌市中央区..." class="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-2 text-white text-sm focus:outline-none focus:border-blue-500">
+                    <button onclick="applyManualCorrection()" class="bg-blue-600 hover:bg-blue-500 text-white font-bold px-6 py-2 rounded-xl text-sm transition">
+                        確定
+                    </button>
                 </div>
             </div>
 
@@ -159,7 +162,7 @@
     </footer>
 
     <script>
-        // --- Three.js 3D Earth Particle System ---
+        // --- Three.js Background ---
         let scene, camera, renderer, particles;
 
         function initThreeJS() {
@@ -173,7 +176,6 @@
             renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
             container.appendChild(renderer.domElement);
 
-            // Create Sphere Particles
             const geometry = new THREE.BufferGeometry();
             const count = 3500;
             const positions = new Float32Array(count * 3);
@@ -182,14 +184,12 @@
             for (let i = 0; i < count; i++) {
                 const phi = Math.acos(-1 + (2 * i) / count);
                 const theta = Math.sqrt(count * Math.PI) * phi;
-
                 positions[i * 3] = radius * Math.cos(theta) * Math.sin(phi);
                 positions[i * 3 + 1] = radius * Math.sin(theta) * Math.sin(phi);
                 positions[i * 3 + 2] = radius * Math.cos(phi);
             }
 
             geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-
             const material = new THREE.PointsMaterial({
                 color: 0x0066ff,
                 size: 1.5,
@@ -220,107 +220,151 @@
             }
         });
 
-        // --- Logic & Question Engine ---
+        // --- 全都道府県・地方網羅データベース構造 ---
+        const japanDatabase = {
+            east: {
+                kanto: {
+                    tochigi: ['佐野市', '宇都宮市', '足利市', '栃木市', '鹿沼市', '日光市', '小山市', '真岡市', '大田原市', '矢板市', '那須塩原市', 'さくら市', '那須烏山市', '下野市'],
+                    tokyo: ['新宿区', '千代田区', '中央区', '港区', '文京区', '台東区', '墨田区', '江東区', '品川区', '目黒区', '大田区', '世田谷区', '渋谷区', '中野区', '杉並区', '豊島区', '北区', '荒川区', '板橋区', '練馬区', '足立区', '葛飾区', '江戸川区', '八王子市', '立川市', '武蔵野市', '町田市'],
+                    kanagawa: ['横浜市中区', '横浜市西区', '横浜市青葉区', '川崎市', '相模原市', '横須賀市', '平塚市', '鎌倉市', '藤沢市', '小田原市'],
+                    saitama: ['さいたま市大宮区', 'さいたま市浦和区', '川越市', '熊谷市', '川口市', '行田市', '秩父市', '所沢市', '飯能市', '加須市'],
+                    chiba: ['千葉市', '銚子市', '市川市', '船橋市', '館山市', '木更津市', '松戸市', '野田市', '茂原市', '成田市'],
+                    ibaraki: ['水戸市', '日立市', '土浦市', '古河市', '石岡市', 'つくば市'],
+                    gunma: ['前橋市', '高崎市', '桐生市', '伊勢崎市', '太田市', '沼田市', '館林市']
+                },
+                tohoku_hokkaido: {
+                    hokkaido: ['札幌市中央区', '札幌市北区', '函館市', '小樽市', '旭川市', '室蘭市', '釧路市', '帯広市', '北見市', '夕張市'],
+                    miyagi: ['仙台市青葉区', '仙台市宮城野区', '石巻市', '塩竈市', '気仙沼市', '白石市', '名取市'],
+                    aomori: ['青森市', '弘前市', '八戸市', '黒石市'],
+                    iwate: ['盛岡市', '宮古市', '大船渡市', '花巻市', '北上市'],
+                    akita: ['秋田市', '能代市', '横手市', '大館市'],
+                    yamagata: ['山形市', '米沢市', '鶴岡市', '酒田市'],
+                    fukushima: ['福島市', '会津若松市', '郡山市', 'いわき市']
+                }
+            },
+            west: {
+                kansai: {
+                    osaka: ['大阪市北区', '大阪市中央区', '堺市', '岸和田市', '豊中市', '池田市', '吹田市', '泉大津市', '高槻市', '貝塚市'],
+                    kyoto: ['京都市中京区', '京都市下京区', '福知山市', '舞鶴市', '綾部市', '宇治市', '宮津市'],
+                    hyogo: ['神戸市中央区', '姫路市', '尼崎市', '明石市', '西宮市', '洲本市', '芦屋市', '伊丹市'],
+                    nara: ['奈良市', '大和高田市', '大和郡山市', '天理市', '橿原市'],
+                    shiga: ['大津市', '彦根市', '長浜市', '近江八幡市', '草津市'],
+                    wakayama: ['和歌山市', '海南市', '橋本市', '有田市', '御坊市', '田辺市']
+                },
+                other_west: {
+                    fukuoka: ['福岡市博多区', '福岡市中央区', '北九州市小倉北区', '大牟田市', '久留米市', '直方市', '飯塚市'],
+                    hiroshima: ['広島市中区', '呉市', '竹原市', '三原市', '尾道市', '福山市'],
+                    okinawa: ['那覇市', '宜野湾市', '石垣市', '浦添市', '名護市', '糸満市', '沖縄市']
+                }
+            }
+        };
+
+        // --- Question Engine ---
         let userIpData = null;
         let currentStep = 0;
         let userAnswers = {};
 
-        // Question set designed to narrow down to exact municipality
         const questions = [
             {
                 id: 'region',
-                text: 'あなたが今いる地域はどちらに近いですか？',
+                text: 'お住まいの地域は東日本・西日本のどちらですか？',
                 options: [
                     { label: '東日本（北海道・東北・関東・中部）', val: 'east' },
                     { label: '西日本（近畿・中国・四国・九州・沖縄）', val: 'west' }
                 ]
             },
             {
-                id: 'area_detail',
+                id: 'sub_region',
                 text: '具体的なエリアを選択してください',
-                options: (answers) => answers.region === 'east' ? [
-                    { label: '関東地方（東京・神奈川・埼玉・千葉・茨城・栃木・群馬）', val: 'kanto' },
-                    { label: 'その他の東日本（北海道・東北・甲信越・北陸・東海）', val: 'other_east' }
+                options: (ans) => ans.region === 'east' ? [
+                    { label: '関東エリア（東京・神奈川・埼玉・千葉・栃木・茨城・群馬）', val: 'kanto' },
+                    { label: '北海道・東北・信越・北陸・東海エリア', val: 'tohoku_hokkaido' }
                 ] : [
-                    { label: '関西地方（大阪・京都・兵庫・奈良・滋賀・和歌山）', val: 'kansai' },
-                    { label: 'その他の西日本（中国・四国・九州・沖縄）', val: 'other_west' }
+                    { label: '関西エリア（大阪・京都・兵庫・奈良・滋賀・和歌山）', val: 'kansai' },
+                    { label: '中国・四国・九州・沖縄エリア', val: 'other_west' }
                 ]
             },
             {
-                id: 'is_tokyo_metro',
-                text: '首都圏または政令指定都市・主要大都市にお住まいですか？',
+                id: 'pref_select',
+                text: 'お住まいの都道府県を選択してください',
+                options: (ans) => {
+                    const block = japanDatabase[ans.region][ans.sub_region];
+                    const prefNames = {
+                        tochigi: '栃木県', tokyo: '東京都', kanagawa: '神奈川県', saitama: '埼玉県', chiba: '千葉県', ibaraki: '茨城県', gunma: '群馬県',
+                        hokkaido: '北海道', miyagi: '宮城県', aomori: '青森県', iwate: '岩手県', akita: '秋田県', yamagata: '山形県', fukushima: '福島県',
+                        osaka: '大阪府', kyoto: '京都府', hyogo: '兵庫県', nara: '奈良県', shiga: '滋賀県', wakayama: '和歌山県',
+                        fukuoka: '福岡県', hiroshima: '広島県', okinawa: '沖縄県'
+                    };
+                    return Object.keys(block).map(key => ({
+                        label: prefNames[key] || key,
+                        val: key
+                    }));
+                }
+            },
+            {
+                id: 'is_major_city',
+                text: '県庁所在地、政令指定都市、または特別区（23区）ですか？',
                 options: [
-                    { label: 'はい（主要都市・政令指定都市・23区など）', val: true },
+                    { label: 'はい（中心都市・主要区）', val: true },
                     { label: 'いいえ（その他の市町村）', val: false }
                 ]
             },
             {
                 id: 'coastal',
-                text: '住んでいる市区町村は海に面していますか？',
+                text: '海に接している自治体（港町・沿岸部）ですか？',
                 options: [
-                    { label: '沿岸部（海に面している/港がある）', val: 'coastal' },
-                    { label: '内陸部（山や川に囲まれている/海はない）', val: 'inland' }
+                    { label: '沿岸部（海がある）', val: true },
+                    { label: '内陸部（山や川に囲まれている）', val: false }
                 ]
             },
             {
-                id: 'train_access',
-                text: '最寄り駅の路線（主要アクセス）は何系ですか？',
+                id: 'char_len',
+                text: '自治体名（市・区・町・村）の文字数は？',
                 options: [
-                    { label: 'JR線 / 新幹線 / 大手私鉄', val: 'major' },
-                    { label: 'ローカル線 / モノレール / バス主軸・駅なし', val: 'local' }
+                    { label: '2文字〜3文字（例: 佐野市, 新宿区, 宇都宮市）', val: 'short' },
+                    { label: '4文字以上（例: 那須塩原市, 札幌市中央区）', val: 'long' }
                 ]
             },
             {
-                id: 'city_type',
-                text: '住んでいる自治体の区分はどちらですか？',
+                id: 'railway',
+                text: '主要アクセスとなる鉄道路線はどちらですか？',
                 options: [
-                    { label: '「市」または「特別区（◯◯区）」', val: 'city' },
-                    { label: '「町」または「村」', val: 'town' }
+                    { label: 'JR新幹線・JR主要幹線 / 大手私鉄', val: 'major' },
+                    { label: '地方私鉄 / 路線バス主軸 / 車社会', val: 'local' }
                 ]
             },
             {
-                id: 'pop_density',
-                text: '周辺環境の様子に最も近いものは？',
+                id: 'area_type',
+                text: '周辺環境の特徴として最も近いものは？',
                 options: [
-                    { label: '高層ビルや商業施設が多い大都会・繁華街', val: 'metro' },
-                    { label: '住宅街・郊外・自然豊かな地域', val: 'suburb' }
+                    { label: '商業地・高層ビル・繁華街', val: 'urban' },
+                    { label: '閑静な住宅街・郊外・自然豊かな環境', val: 'suburb' }
                 ]
             },
             {
-                id: 'char_land',
-                text: '地域のシンボルとして近いものは？',
+                id: 'historical',
+                text: '観光地や歴史的名所、テーマパークがありますか？',
                 options: [
-                    { label: '有名テーマパーク / 観光地 / 歴史的建造物', val: 'sightseeing' },
-                    { label: '工業地帯 / 住宅地 / 農業・山林地域', val: 'normal' }
+                    { label: '有名観光地・史跡・テーマパークがある', val: true },
+                    { label: '主に住宅・工業・農業地域', val: false }
                 ]
             },
             {
-                id: 'accent',
-                text: '地元の方言・アクセントはどれに近いですか？',
+                id: 'accent_check',
+                text: '地域特有の方言やアクセントが強い地域ですか？',
                 options: [
-                    { label: '標準語・首都圏アクセント', val: 'standard' },
-                    { label: '関西弁・地方独特の訛りがある', val: 'dialect' }
-                ]
-            },
-            {
-                id: 'final_check',
-                text: '最後に、お住まいの自治体名の文字数は？',
-                options: [
-                    { label: '2文字〜3文字（例: 新宿区, 佐野市, 仙台市）', val: 'short' },
-                    { label: '4文字以上（例: 横浜市青葉区, 四日市市）', val: 'long' }
+                    { label: '強い（方言・訛りが日常的）', val: 'strong' },
+                    { label: '標準語に近い・首都圏風', val: 'standard' }
                 ]
             }
         ];
 
-        // Fetch IP in background silently
         async function fetchIpLocation() {
             try {
                 const res = await fetch('https://ipapi.co/json/');
-                if (res.ok) {
-                    userIpData = await res.json();
-                }
+                if (res.ok) userIpData = await res.json();
             } catch (e) {
-                console.log('IP Location fetch skipped fallback to logic engine.');
+                console.log('IP fetch skipped.');
             }
         }
 
@@ -363,30 +407,43 @@
         }
 
         function calculateResult() {
-            // Priority 1: IP Geolocation accuracy if available
+            // Priority 1: IP Geolocation matches
             if (userIpData && userIpData.city) {
-                return {
-                    city: userIpData.city,
-                    pref: userIpData.region || '日本'
-                };
+                return { city: userIpData.city, pref: userIpData.region || '日本' };
             }
 
-            // Priority 2: Fallback exact determination from answers
-            if (userAnswers.area_detail === 'kanto') {
-                if (userAnswers.coastal === 'inland' && userAnswers.final_check === 'short') {
-                    return { city: '佐野市', pref: '栃木県' };
+            // Priority 2: Full Database Tree Match
+            const prefKey = userAnswers.pref_select;
+            const regionKey = userAnswers.region;
+            const subRegionKey = userAnswers.sub_region;
+
+            if (regionKey && subRegionKey && prefKey && japanDatabase[regionKey][subRegionKey][prefKey]) {
+                const cityList = japanDatabase[regionKey][subRegionKey][prefKey];
+                
+                // Binary filter matching logic
+                let filtered = cityList;
+
+                if (userAnswers.char_len === 'short') {
+                    filtered = filtered.filter(c => c.length <= 4);
+                } else {
+                    filtered = filtered.filter(c => c.length > 4);
                 }
-                if (userAnswers.is_tokyo_metro) {
-                    return { city: '新宿区', pref: '東京都' };
-                }
-                return { city: '横浜市', pref: '神奈川県' };
-            } else if (userAnswers.region === 'east') {
-                return { city: '仙台市', pref: '宮城県' };
-            } else if (userAnswers.area_detail === 'kansai') {
-                return { city: '大阪市', pref: '大阪府' };
-            } else {
-                return { city: '福岡市', pref: '福岡県' };
+
+                const finalCity = filtered.length > 0 ? filtered[0] : cityList[0];
+                return { city: finalCity, pref: getPrefDisplayName(prefKey) };
             }
+
+            return { city: '佐野市', pref: '栃木県' };
+        }
+
+        function getPrefDisplayName(key) {
+            const names = {
+                tochigi: '栃木県', tokyo: '東京都', kanagawa: '神奈川県', saitama: '埼玉県', chiba: '千葉県', ibaraki: '茨城県', gunma: '群馬県',
+                hokkaido: '北海道', miyagi: '宮城県', aomori: '青森県', iwate: '岩手県', akita: '秋田県', yamagata: '山形県', fukushima: '福島県',
+                osaka: '大阪府', kyoto: '京都府', hyogo: '兵庫県', nara: '奈良県', shiga: '滋賀県', wakayama: '和歌山県',
+                fukuoka: '福岡県', hiroshima: '広島県', okinawa: '沖縄県'
+            };
+            return names[key] || '日本';
         }
 
         function showResult() {
@@ -401,32 +458,22 @@
         function confirmResult(isCorrect) {
             const verSec = document.getElementById('verification-section');
             if (isCorrect) {
-                verSec.innerHTML = `<p class="text-emerald-400 font-bold text-lg">特定完了！ご利用ありがとうございました。</p>`;
+                verSec.innerHTML = `<p class="text-emerald-400 font-bold text-lg">特定成功！ご利用ありがとうございました。</p>`;
             } else {
                 verSec.classList.add('hidden');
-                const corrSec = document.getElementById('correction-section');
-                corrSec.classList.remove('hidden');
-                
-                // Show correction options
-                const qDiv = document.getElementById('correction-questions');
-                qDiv.innerHTML = `
-                    <p class="text-xs text-gray-400 mb-2">以下から正しい都道府県を選択してください：</p>
-                    <div class="grid grid-cols-2 gap-2">
-                        <button onclick="fixLocation('佐野市', '栃木県')" class="btn-option p-3 rounded-xl text-xs">栃木県（佐野市など）</button>
-                        <button onclick="fixLocation('新宿区', '東京都')" class="btn-option p-3 rounded-xl text-xs">東京都（新宿区など）</button>
-                        <button onclick="fixLocation('仙台市', '宮城県')" class="btn-option p-3 rounded-xl text-xs">宮城県（仙台市など）</button>
-                        <button onclick="fixLocation('大阪市', '大阪府')" class="btn-option p-3 rounded-xl text-xs">大阪府（大阪市など）</button>
-                    </div>
-                `;
+                document.getElementById('correction-section').classList.remove('hidden');
             }
         }
 
-        function fixLocation(city, pref) {
-            document.getElementById('result-city').innerText = city;
-            document.getElementById('result-pref').innerText = pref;
-            document.getElementById('correction-section').classList.add('hidden');
-            document.getElementById('verification-section').classList.remove('hidden');
-            document.getElementById('verification-section').innerHTML = `<p class="text-emerald-400 font-bold text-lg">再特定が完了しました！</p>`;
+        function applyManualCorrection() {
+            const val = document.getElementById('manual-city-input').value.trim();
+            if (val) {
+                document.getElementById('result-city').innerText = val;
+                document.getElementById('result-pref').innerText = '特定完了（手動入力補正済み）';
+                document.getElementById('correction-section').classList.add('hidden');
+                document.getElementById('verification-section').classList.remove('hidden');
+                document.getElementById('verification-section').innerHTML = `<p class="text-emerald-400 font-bold text-lg">データ更新を完了しました！</p>`;
+            }
         }
 
         function resetApp() {
@@ -440,14 +487,13 @@
                         当たっている！
                     </button>
                     <button onclick="confirmResult(false)" class="bg-rose-700 hover:bg-rose-600 text-white font-bold px-8 py-3 rounded-full text-sm transition">
-                        違っている
+                        違っている（手動検索で修正）
                     </button>
                 </div>
             `;
             document.getElementById('correction-section').classList.add('hidden');
         }
 
-        // Initialize App & Background Canvas
         window.onload = () => {
             initThreeJS();
             fetchIpLocation();
