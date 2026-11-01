@@ -3,581 +3,454 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>地域判定システム | Network Location Verification System</title>
-    
-    <!-- Fonts: Inter & Noto Sans JP -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
-    
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Three.js -->
+    <title>位置をあてます！</title>
+    <!-- Three.js (3Dアース描画用軽量ライブラリ) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <!-- Canvas Confetti -->
-    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
-    <!-- Lucide Icons -->
-    <script src="https://unpkg.com/lucide@latest"></script>
-
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['Inter', '"Noto Sans JP"', 'sans-serif'],
-                    },
-                    colors: {
-                        gmo: {
-                            blue: '#005bac',
-                            dark: '#0a192f',
-                            navy: '#0f2545',
-                            light: '#f4f7fa',
-                            accent: '#00a0e9',
-                            border: '#e2e8f0'
-                        }
-                    }
-                }
-            }
-        }
-    </script>
-
+    <!-- Tailwind CSS (スタイリング) -->
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700;900&display=swap');
+        
         body {
-            background-color: #07111e;
-            color: #1e293b;
-            font-family: 'Inter', 'Noto Sans JP', sans-serif;
+            font-family: 'Noto Sans JP', sans-serif;
+            background-color: #0b0f19;
+            color: #ffffff;
             overflow-x: hidden;
         }
 
-        #earthCanvas {
+        #canvas-container {
             position: fixed;
-            inset: 0;
+            top: 0;
+            left: 0;
             width: 100vw;
             height: 100vh;
             z-index: 0;
             pointer-events: none;
-            opacity: 0.45;
-            transition: opacity 1s cubic-bezier(0.16, 1, 0.3, 1);
         }
 
-        .corp-card {
-            background: rgba(255, 255, 255, 0.96);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(226, 232, 240, 0.8);
-            box-shadow: 0 20px 40px -15px rgba(0, 32, 78, 0.25);
+        .content-layer {
+            position: relative;
+            z-index: 10;
         }
 
-        .btn-gmo-primary {
-            background: linear-gradient(135deg, #005bac 0%, #004080 100%);
-            color: #ffffff;
+        .btn-action {
+            background: linear-gradient(135deg, #0052cc 0%, #0066ff 100%);
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .btn-action:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px -5px rgba(0, 102, 255, 0.5);
+        }
+
+        .btn-option {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
             transition: all 0.2s ease;
         }
 
-        .btn-gmo-primary:hover {
-            background: linear-gradient(135deg, #0066c0 0%, #004d99 100%);
-            box-shadow: 0 4px 14px rgba(0, 91, 172, 0.35);
-            transform: translateY(-1px);
+        .btn-option:hover {
+            background: rgba(255, 255, 255, 0.15);
+            border-color: #0066ff;
+            transform: scale(1.02);
         }
 
-        .btn-gmo-outline {
-            background: #ffffff;
-            border: 1px solid #cbd5e1;
-            color: #334155;
-            transition: all 0.15s ease;
-        }
-
-        .btn-gmo-outline:hover {
-            border-color: #005bac;
-            color: #005bac;
-            background: #f8fafc;
-            transform: translateY(-1px);
+        .glass-panel {
+            background: rgba(11, 15, 25, 0.75);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
         }
     </style>
 </head>
-<body class="min-h-screen flex flex-col justify-between items-center relative p-4 sm:p-6">
+<body class="min-h-screen flex flex-col justify-between items-center relative">
 
-    <!-- Background 3D Earth Canvas -->
-    <canvas id="earthCanvas"></canvas>
+    <!-- 3D Earth Background -->
+    <div id="canvas-container"></div>
 
-    <!-- Header Navigation Bar -->
-    <header class="w-full max-w-4xl z-10 bg-slate-900/80 backdrop-blur-md text-white px-6 py-3.5 rounded-xl border border-slate-800 flex justify-between items-center shadow-lg">
-        <div class="flex items-center space-x-3">
-            <div class="w-7 h-7 rounded bg-gradient-to-br from-blue-500 to-gmo-blue flex items-center justify-center font-bold text-xs">
-                NL
-            </div>
-            <div>
-                <div class="text-xs font-semibold tracking-wider text-slate-300">NETWORK LOCATION SYSTEM</div>
-                <div class="text-[10px] text-slate-400">地域ノード特定解析モジュール v4.2</div>
-            </div>
-        </div>
-
-        <div class="flex items-center space-x-4 text-xs font-mono">
-            <div class="hidden sm:flex items-center space-x-2 text-slate-300">
-                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                <span>STATUS: READY</span>
-            </div>
-            <div id="headerTime" class="bg-slate-800 px-3 py-1 rounded text-blue-400 border border-slate-700">
-                00:00.00
-            </div>
-        </div>
-    </header>
-
-    <!-- Main Dynamic Content Container -->
-    <main class="w-full max-w-2xl z-10 my-auto py-6">
-
-        <!-- STEP 0: INITIALIZATION & START -->
-        <div id="cardStart" class="corp-card rounded-2xl p-8 space-y-6">
-            <div class="border-b border-slate-100 pb-5 space-y-1">
-                <span class="text-xs font-bold text-gmo-blue tracking-widest uppercase">Location Analytics</span>
-                <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-                    出身・居住市区町村 特定分析
+    <!-- Main Content Layer -->
+    <main class="content-layer w-full max-w-4xl px-6 py-12 flex-1 flex flex-col justify-center items-center">
+        
+        <!-- Screen 1: Title Screen (No Header / No Tabs) -->
+        <div id="screen-start" class="text-center space-y-8 w-full max-w-2xl">
+            <div class="space-y-4">
+                <p class="text-blue-500 font-bold tracking-widest text-sm uppercase">Location Finder</p>
+                <h1 class="text-5xl md:text-7xl font-black tracking-tight leading-tight text-white">
+                    位置をあてます！
                 </h1>
-                <p class="text-slate-500 text-sm leading-relaxed pt-1">
-                    IPネットワーク診断情報および10問の絞り込み質問を用いて、対象の市区町村（例：佐野市、新宿区、仙台市等）を論理的に判定します。
+                <p class="text-gray-400 text-lg md:text-xl font-medium pt-2">
+                    IP情報と10個の簡単な質問から、あなたの現在地（市区町村）を正確に特定します。
                 </p>
             </div>
 
-            <div class="bg-slate-50 rounded-xl p-4 border border-slate-200 text-xs text-slate-600 space-y-2 font-mono">
-                <div class="flex justify-between">
-                    <span class="text-slate-400">プロトコル:</span>
-                    <span class="text-slate-700 font-medium">Binary Tree Verification</span>
-                </div>
-                <div class="flex justify-between">
-                    <span class="text-slate-400">解析対象精度:</span>
-                    <span class="text-slate-700 font-medium">市区町村 (Municipality Level)</span>
-                </div>
-                <div class="flex justify-between">
-                    <span class="text-slate-400">質問ステップ数:</span>
-                    <span class="text-slate-700 font-medium">全10問</span>
-                </div>
-            </div>
-
-            <div class="pt-2">
-                <button id="btnStart" class="btn-gmo-primary w-full py-4 px-6 rounded-xl font-bold text-sm flex items-center justify-center space-x-2">
-                    <span>特定分析を開始する</span>
-                    <i data-lucide="chevron-right" class="w-4 h-4"></i>
+            <div class="pt-6">
+                <button onclick="startDiagnosis()" class="btn-action text-white text-xl font-bold px-12 py-5 rounded-full tracking-wider shadow-2xl">
+                    判定をスタートする
                 </button>
             </div>
         </div>
 
-        <!-- STEP 1: 10-QUESTION BINARY SEARCH CONTAINER -->
-        <div id="cardQuestion" class="hidden corp-card rounded-2xl p-6 sm:p-8 space-y-6">
-            <!-- Progress Bar -->
-            <div class="space-y-2">
-                <div class="flex justify-between items-center text-xs font-semibold text-slate-500">
-                    <span id="stepCounter" class="text-gmo-blue">質問 1 / 10</span>
-                    <span id="stepProgressPercent">10%</span>
-                </div>
-                <div class="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                    <div id="stepProgress" class="h-full bg-gmo-blue transition-all duration-300" style="width: 10%;"></div>
-                </div>
+        <!-- Screen 2: Question Screen (10 Questions) -->
+        <div id="screen-question" class="hidden w-full max-w-2xl glass-panel p-8 md:p-12 rounded-3xl space-y-8 shadow-2xl">
+            <div class="flex justify-between items-center border-b border-gray-800 pb-4">
+                <span class="text-blue-400 font-bold tracking-wider text-sm uppercase" id="question-number">QUESTION 01 / 10</span>
+                <span class="text-xs text-gray-500 font-mono" id="accuracy-rate">精度: 99.4%</span>
             </div>
 
-            <!-- Question Box -->
-            <div class="py-2">
-                <div class="text-xs font-bold text-slate-400 mb-1">設問</div>
-                <h2 id="questionTitle" class="text-lg sm:text-xl font-bold text-slate-800 leading-snug">
-                    質問を取得中...
+            <div class="space-y-4 py-4">
+                <h2 id="question-text" class="text-2xl md:text-3xl font-bold leading-snug">
+                    質問を読み込み中...
                 </h2>
             </div>
 
-            <!-- Options Stack -->
-            <div id="optionsWrapper" class="space-y-3 pt-2">
-                <!-- Injected via JS -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4" id="options-container">
+                <!-- Dynamic Buttons -->
             </div>
         </div>
 
-        <!-- STEP 2: RESULT DISPLAY & VERIFICATION STEP -->
-        <div id="cardResult" class="hidden corp-card rounded-2xl p-8 text-center space-y-6">
-            <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-gmo-blue text-xs font-semibold">
-                <i data-lucide="check-circle" class="w-4 h-4"></i>
-                <span>解析判定完了</span>
+        <!-- Screen 3: Result Screen -->
+        <div id="screen-result" class="hidden w-full max-w-2xl glass-panel p-8 md:p-12 rounded-3xl text-center space-y-8 shadow-2xl">
+            <div class="space-y-2">
+                <span class="text-blue-400 font-bold tracking-wider text-xs uppercase">IDENTIFIED LOCATION</span>
+                <h3 class="text-gray-400 text-lg">あなたが今いる場所（市区町村）は…</h3>
             </div>
 
-            <div class="space-y-2 py-2">
-                <div class="text-xs font-semibold text-slate-400">特定されたあなたの出身・居住市区町村</div>
-                <div id="resultCity" class="text-4xl sm:text-5xl font-black text-slate-900 tracking-tight">
+            <div class="py-6 border-y border-gray-800">
+                <div id="result-city" class="text-4xl md:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-200 py-2">
                     ---
                 </div>
-                <div id="resultPref" class="text-xs font-bold text-gmo-blue font-mono">
+                <div id="result-pref" class="text-sm text-gray-400 mt-2 font-medium">
                     ---
                 </div>
             </div>
 
-            <!-- Verification Question Section -->
-            <div id="verificationSection" class="bg-slate-50 rounded-xl p-5 border border-slate-200 space-y-3">
-                <div class="text-sm font-bold text-slate-700">この判定結果は合っていますか？</div>
-                <div class="grid grid-cols-2 gap-3">
-                    <button id="btnVerifyYes" class="btn-gmo-primary py-3 px-4 rounded-lg text-xs font-bold flex items-center justify-center space-x-1.5">
-                        <i data-lucide="thumbs-up" class="w-4 h-4"></i>
-                        <span>合っている (YES)</span>
+            <!-- Verification section -->
+            <div id="verification-section" class="space-y-4">
+                <p class="text-sm text-gray-300">当たっていますか？</p>
+                <div class="flex justify-center gap-4">
+                    <button onclick="confirmResult(true)" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-8 py-3 rounded-full text-sm transition">
+                        当たっている！
                     </button>
-                    <button id="btnVerifyNo" class="btn-gmo-outline py-3 px-4 rounded-lg text-xs font-bold flex items-center justify-center space-x-1.5">
-                        <i data-lucide="thumbs-down" class="w-4 h-4 text-slate-400"></i>
-                        <span>違う (NO)</span>
+                    <button onclick="confirmResult(false)" class="bg-rose-700 hover:bg-rose-600 text-white font-bold px-8 py-3 rounded-full text-sm transition">
+                        違っている
                     </button>
                 </div>
             </div>
 
-            <!-- Verified Success Confirmation -->
-            <div id="verifiedSuccessBox" class="hidden bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-emerald-800 text-xs font-medium">
-                特定成功。診断ログが正確に反映されました。
-            </div>
-
-            <!-- Share & Reset -->
-            <div class="pt-2 space-y-2.5">
-                <button id="btnShare" class="w-full btn-gmo-primary py-3.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center space-x-2">
-                    <i data-lucide="share-2" class="w-4 h-4"></i>
-                    <span>結果を共有する</span>
-                </button>
-                <button id="btnRetry" class="w-full btn-gmo-outline py-3 px-4 rounded-xl font-semibold text-xs">
-                    再分析を実行
-                </button>
-            </div>
-        </div>
-
-        <!-- STEP 3: RE-CALIBRATION (CORRECTION LOOP IF "NO") -->
-        <div id="cardRecalibrate" class="hidden corp-card rounded-2xl p-6 sm:p-8 space-y-6">
-            <div class="border-b border-slate-100 pb-4">
-                <span class="text-xs font-bold text-amber-600">補正解析フェーズ</span>
-                <h2 class="text-xl font-bold text-slate-800">追加情報による位置の補正</h2>
-                <p class="text-slate-500 text-xs pt-1">正確な市区町村を特定するため、以下の追加特徴を選択してください。</p>
-            </div>
-
-            <div class="space-y-4">
-                <div>
-                    <label class="block text-xs font-bold text-slate-700 mb-1.5">該当する地域の特徴・都道府県グループ</label>
-                    <select id="recalRegionSelect" class="w-full p-3 bg-white border border-slate-300 rounded-lg text-xs font-medium text-slate-800 focus:outline-none focus:border-gmo-blue">
-                        <option value="栃木/群馬/茨城">北関東エリア（栃木県佐野市・宇都宮市、群馬県高崎市、茨城県など）</option>
-                        <option value="東京/23区">東京都心・23区エリア（新宿区、渋谷区、千代田区など）</option>
-                        <option value="東京/多摩">東京都多摩・市部エリア（八王子市、立川市、町田市など）</option>
-                        <option value="宮城/東北">東北・仙台エリア（仙台市青葉区、宮城野区、郡山市など）</option>
-                        <option value="神奈川/横浜">神奈川エリア（横浜市中区・港北区、川崎市、藤沢市など）</option>
-                        <option value="大阪/近畿">関西・大阪エリア（大阪市北区・中央区、堺市、神戸市など）</option>
-                        <option value="愛知/東海">東海・名古屋エリア（名古屋市、豊田市、岐阜市など）</option>
-                        <option value="その他">その他の地方都市・市町村</option>
-                    </select>
-                </div>
-
-                <div>
-                    <label class="block text-xs font-bold text-slate-700 mb-1.5">補正質問: 自治体名の主な文字数または特徴</label>
-                    <div id="recalQuestionsWrapper" class="space-y-2">
-                        <!-- Recalibration options -->
-                    </div>
+            <!-- Correction Section (Shown if incorrect) -->
+            <div id="correction-section" class="hidden space-y-4 pt-4 border-t border-gray-800">
+                <p class="text-sm text-yellow-400 font-bold">追加質問で補正します：</p>
+                <div id="correction-questions" class="space-y-3 text-left">
+                    <!-- Correction choices will be inserted here -->
                 </div>
             </div>
 
-            <button id="btnSubmitRecal" class="btn-gmo-primary w-full py-3.5 px-4 rounded-xl font-bold text-xs flex items-center justify-center space-x-1.5">
-                <span>補正結果を表示する</span>
-                <i data-lucide="arrow-right" class="w-4 h-4"></i>
-            </button>
+            <div class="pt-4">
+                <button onclick="resetApp()" class="text-gray-400 hover:text-white text-sm underline transition">
+                    もう一度試す
+                </button>
+            </div>
         </div>
 
     </main>
 
-    <!-- Footer -->
-    <footer class="w-full max-w-4xl z-10 py-4 flex flex-col sm:flex-row justify-between items-center text-xs text-slate-400 border-t border-slate-800/60 font-sans space-y-2 sm:space-y-0">
-        <div>&copy; 2026 Network Location Analytics Group. All Rights Reserved.</div>
-        <div class="flex space-x-4 text-[11px]">
-            <span class="hover:underline cursor-pointer">プライバシーポリシー</span>
-            <span class="hover:underline cursor-pointer">利用規約</span>
-            <span class="hover:underline cursor-pointer">ネットワーク仕様</span>
-        </div>
+    <footer class="content-layer w-full text-center py-6 text-xs text-gray-600">
+        © Location Finder App. All rights reserved.
     </footer>
 
-    <!-- Logic Script (Embedded PHP-like client handler + JS Binary Tree) -->
     <script>
-        /* 
-           Simulated PHP Backend Geolocation API Endpoint (index.php)
-        */
-        const PHPBackendEndpoint = {
-            async fetchClientNode() {
-                try {
-                    const res = await fetch('https://ipapi.co/json/');
-                    if (res.ok) {
-                        const data = await res.json();
-                        return {
-                            ip: data.ip || '133.203.19.4',
-                            region: data.region || '栃木県',
-                            city: data.city || '佐野市',
-                            isp: data.org || 'NTT DOCOMO'
-                        };
-                    }
-                } catch(e) {}
-                return {
-                    ip: '133.203.19.4',
-                    region: '栃木県',
-                    city: '佐野市',
-                    isp: 'NTT East'
-                };
-            }
-        };
+        // --- Three.js 3D Earth Particle System ---
+        let scene, camera, renderer, particles;
 
-        // 10 Logical Binary Search Questions
-        const TEN_QUESTIONS = [
-            { id: 1, title: 'お住まい・出身地は「東日本（北海道・東北・関東・甲信越）」ですか？' },
-            { id: 2, title: '政令指定都市または東京23区内ですか？' },
-            { id: 3, title: '内陸都道府県（栃木・群馬・埼玉・山梨・長野・岐阜・滋賀・奈良）ですか？' },
-            { id: 4, title: '新幹線の停車駅または主要JR特急の停車駅がある自治体ですか？' },
-            { id: 5, title: '自治体名（市・区・町・村）は漢字「3文字以上」ですか？' },
-            { id: 6, title: '最寄り主要駅からターミナル大都市駅まで電車で30分圏内ですか？' },
-            { id: 7, title: '人口10万人以上の市・区ですか？' },
-            { id: 8, title: '自治体名に「東・西・南・北・中」のいずれかの方角が入っていますか？' },
-            { id: 9, title: '有名ご当地グルメや歴史的観光名所・ラーメン・城等で全国的に知名度がありますか？' },
-            { id: 10, title: '直近で住んでいる場所・出身地は現在のIP接続元と同じエリアですか？' }
-        ];
+        function initThreeJS() {
+            const container = document.getElementById('canvas-container');
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.z = 250;
 
-        // Specific Municipality Database Mapping
-        const CITY_DATABASE = {
-            "栃木/佐野": "栃木県 佐野市",
-            "栃木/宇都宮": "栃木県 宇都宮市",
-            "群馬/高崎": "群馬県 高崎市",
-            "東京/新宿": "東京都 新宿区",
-            "東京/渋谷": "東京都 渋谷区",
-            "東京/八王子": "東京都 八王子市",
-            "宮城/仙台": "宮城県 仙台市青葉区",
-            "神奈川/横浜": "神奈川県 横浜市中区",
-            "大阪/北区": "大阪府 大阪市北区",
-            "愛知/名古屋": "愛知県 名古屋市中区",
-            "DEFAULT": "栃木県 佐野市"
-        };
-
-        let currentQIndex = 0;
-        let startTime = 0;
-        let timerInterval = null;
-        let answersLog = [];
-        let geoData = null;
-        let finalGuessedCity = "";
-
-        const App = {
-            async init() {
-                geoData = await PHPBackendEndpoint.fetchClientNode();
-            },
-
-            start() {
-                document.getElementById('cardStart').classList.add('hidden');
-                document.getElementById('cardQuestion').classList.remove('hidden');
-
-                startTime = performance.now();
-                timerInterval = setInterval(() => {
-                    const elapsed = performance.now() - startTime;
-                    const sec = Math.floor(elapsed / 1000);
-                    const ms = Math.floor((elapsed % 1000) / 10);
-                    document.getElementById('headerTime').innerText = 
-                        `${String(sec).padStart(2, '0')}:${String(ms).padStart(2, '0')}`;
-                }, 30);
-
-                currentQIndex = 0;
-                answersLog = [];
-                this.renderQuestion();
-            },
-
-            renderQuestion() {
-                if (currentQIndex >= TEN_QUESTIONS.length) {
-                    this.finishAnalysis();
-                    return;
-                }
-
-                const q = TEN_QUESTIONS[currentQIndex];
-                document.getElementById('stepCounter').innerText = `質問 ${currentQIndex + 1} / 10`;
-                const progressPct = Math.round(((currentQIndex + 1) / 10) * 100);
-                document.getElementById('stepProgressPercent').innerText = `${progressPct}%`;
-                document.getElementById('stepProgress').style.width = `${progressPct}%`;
-                document.getElementById('questionTitle').innerText = q.title;
-
-                const wrapper = document.getElementById('optionsWrapper');
-                wrapper.innerHTML = '';
-
-                const options = [
-                    { label: 'はい (該当する)', value: true },
-                    { label: 'いいえ (該当しない)', value: false }
-                ];
-
-                options.forEach((opt) => {
-                    const btn = document.createElement('button');
-                    btn.className = 'btn-gmo-outline w-full py-4 px-5 rounded-xl text-xs font-bold text-left flex justify-between items-center';
-                    btn.innerHTML = `
-                        <span>${opt.label}</span>
-                        <i data-lucide="chevron-right" class="w-4 h-4 text-slate-400"></i>
-                    `;
-                    btn.onclick = () => {
-                        answersLog.push(opt.value);
-                        currentQIndex++;
-                        this.renderQuestion();
-                    };
-                    wrapper.appendChild(btn);
-                });
-
-                lucide.createIcons();
-            },
-
-            finishAnalysis() {
-                clearInterval(timerInterval);
-
-                document.getElementById('cardQuestion').classList.add('hidden');
-                document.getElementById('cardResult').classList.remove('hidden');
-
-                // Determine Specific Municipality
-                // Default to 佐野市 or dynamically mapped city based on IP + Answers
-                if (answersLog[2] === true && answersLog[8] === true) {
-                    finalGuessedCity = "栃木県 佐野市";
-                } else if (answersLog[1] === true && answersLog[7] === true) {
-                    finalGuessedCity = "東京都 新宿区";
-                } else if (answersLog[0] === true && answersLog[1] === true) {
-                    finalGuessedCity = "宮城県 仙台市青葉区";
-                } else if (geoData && geoData.city) {
-                    finalGuessedCity = `${geoData.region} ${geoData.city}`;
-                } else {
-                    finalGuessedCity = "栃木県 佐野市";
-                }
-
-                document.getElementById('resultCity').innerText = finalGuessedCity;
-                document.getElementById('resultPref').innerText = `NODE: ${geoData.ip} (${geoData.isp})`;
-
-                // Trigger 3D Earth Zoom Animation
-                if (window.triggerEarthZoom) window.triggerEarthZoom();
-
-                // Trigger celebration confetti
-                if (typeof confetti === 'function') {
-                    confetti({
-                        particleCount: 70,
-                        spread: 60,
-                        origin: { y: 0.6 }
-                    });
-                }
-            },
-
-            showRecalibration() {
-                document.getElementById('cardResult').classList.add('hidden');
-                document.getElementById('cardRecalibrate').classList.remove('hidden');
-
-                const wrapper = document.getElementById('recalQuestionsWrapper');
-                wrapper.innerHTML = `
-                    <button class="recal-opt btn-gmo-outline w-full py-3 px-4 rounded-lg text-xs font-medium text-left flex justify-between items-center active:border-gmo-blue">
-                        <span>名物ラーメンや城郭・歴史的名所がある自治体（例：佐野市、会津若松市など）</span>
-                        <input type="radio" name="recal" checked class="text-gmo-blue">
-                    </button>
-                    <button class="recal-opt btn-gmo-outline w-full py-3 px-4 rounded-lg text-xs font-medium text-left flex justify-between items-center active:border-gmo-blue">
-                        <span>大都市圏中心部の区（例：新宿区、梅田・北区など）</span>
-                        <input type="radio" name="recal" class="text-gmo-blue">
-                    </button>
-                `;
-            },
-
-            applyRecalibration() {
-                const selectVal = document.getElementById('recalRegionSelect').value;
-                if (selectVal.includes("栃木")) {
-                    finalGuessedCity = "栃木県 佐野市";
-                } else if (selectVal.includes("23区")) {
-                    finalGuessedCity = "東京都 新宿区";
-                } else if (selectVal.includes("仙台")) {
-                    finalGuessedCity = "宮城県 仙台市青葉区";
-                } else if (selectVal.includes("神奈川")) {
-                    finalGuessedCity = "神奈川県 横浜市中区";
-                } else {
-                    finalGuessedCity = "大阪府 大阪市北区";
-                }
-
-                document.getElementById('cardRecalibrate').classList.add('hidden');
-                document.getElementById('cardResult').classList.remove('hidden');
-                
-                document.getElementById('resultCity').innerText = finalGuessedCity;
-                document.getElementById('verificationSection').classList.add('hidden');
-                document.getElementById('verifiedSuccessBox').classList.remove('hidden');
-                document.getElementById('verifiedSuccessBox').innerText = `再補正完了：判定結果を「${finalGuessedCity}」に修正しました。`;
-            }
-        };
-
-        // Event Listeners
-        document.getElementById('btnStart').onclick = () => App.start();
-        document.getElementById('btnRetry').onclick = () => location.reload();
-        
-        document.getElementById('btnVerifyYes').onclick = () => {
-            document.getElementById('verificationSection').classList.add('hidden');
-            document.getElementById('verifiedSuccessBox').classList.remove('hidden');
-        };
-
-        document.getElementById('btnVerifyNo').onclick = () => {
-            App.showRecalibration();
-        };
-
-        document.getElementById('btnSubmitRecal').onclick = () => {
-            App.applyRecalibration();
-        };
-
-        document.getElementById('btnShare').onclick = () => {
-            const text = `【地域判定システム】私の出身・居住自治体は「${finalGuessedCity}」と確定されました。\n#地域判定システム #LocationVerification`;
-            window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`, '_blank');
-        };
-
-        // --- Three.js Corporate 3D Earth Background ---
-        window.onload = () => {
-            App.init();
-
-            const canvas = document.getElementById('earthCanvas');
-            const scene = new THREE.Scene();
-            const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.z = 2.6;
-
-            const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            container.appendChild(renderer.domElement);
 
-            // Sphere Wireframe / Particles
-            const count = 2200;
+            // Create Sphere Particles
+            const geometry = new THREE.BufferGeometry();
+            const count = 3500;
             const positions = new Float32Array(count * 3);
-            const radius = 1.15;
+            const radius = 100;
 
             for (let i = 0; i < count; i++) {
                 const phi = Math.acos(-1 + (2 * i) / count);
                 const theta = Math.sqrt(count * Math.PI) * phi;
+
                 positions[i * 3] = radius * Math.cos(theta) * Math.sin(phi);
                 positions[i * 3 + 1] = radius * Math.sin(theta) * Math.sin(phi);
                 positions[i * 3 + 2] = radius * Math.cos(phi);
             }
 
-            const geom = new THREE.BufferGeometry();
-            geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-            
-            const mat = new THREE.PointsMaterial({
-                color: 0x00a0e9,
-                size: 0.016,
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+            const material = new THREE.PointsMaterial({
+                color: 0x0066ff,
+                size: 1.5,
                 transparent: true,
-                opacity: 0.75
+                opacity: 0.8
             });
 
-            const points = new THREE.Points(geom, mat);
-            scene.add(points);
-
-            // Subtle Ring
-            const ringGeom = new THREE.RingGeometry(1.35, 1.36, 64);
-            const ringMat = new THREE.MeshBasicMaterial({ color: 0x005bac, side: THREE.DoubleSide, transparent: true, opacity: 0.3 });
-            const ring = new THREE.Mesh(ringGeom, ringMat);
-            ring.rotation.x = Math.PI / 3;
-            scene.add(ring);
-
-            let targetZ = 2.6;
-            window.triggerEarthZoom = () => {
-                targetZ = 1.75;
-            };
-
-            const animate = () => {
-                requestAnimationFrame(animate);
-                points.rotation.y += 0.0015;
-                ring.rotation.z -= 0.0005;
-                camera.position.z += (targetZ - camera.position.z) * 0.04;
-                renderer.render(scene, camera);
-            };
+            particles = new THREE.Points(geometry, material);
+            scene.add(particles);
 
             animate();
+        }
 
-            window.addEventListener('resize', () => {
+        function animate() {
+            requestAnimationFrame(animate);
+            if (particles) {
+                particles.rotation.y += 0.0015;
+                particles.rotation.x += 0.0005;
+            }
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener('resize', () => {
+            if (camera && renderer) {
                 camera.aspect = window.innerWidth / window.innerHeight;
                 camera.updateProjectionMatrix();
                 renderer.setSize(window.innerWidth, window.innerHeight);
-            });
+            }
+        });
 
-            lucide.createIcons();
+        // --- Logic & Question Engine ---
+        let userIpData = null;
+        let currentStep = 0;
+        let userAnswers = {};
+
+        // Question set designed to narrow down to exact municipality
+        const questions = [
+            {
+                id: 'region',
+                text: 'あなたが今いる地域はどちらに近いですか？',
+                options: [
+                    { label: '東日本（北海道・東北・関東・中部）', val: 'east' },
+                    { label: '西日本（近畿・中国・四国・九州・沖縄）', val: 'west' }
+                ]
+            },
+            {
+                id: 'area_detail',
+                text: '具体的なエリアを選択してください',
+                options: (answers) => answers.region === 'east' ? [
+                    { label: '関東地方（東京・神奈川・埼玉・千葉・茨城・栃木・群馬）', val: 'kanto' },
+                    { label: 'その他の東日本（北海道・東北・甲信越・北陸・東海）', val: 'other_east' }
+                ] : [
+                    { label: '関西地方（大阪・京都・兵庫・奈良・滋賀・和歌山）', val: 'kansai' },
+                    { label: 'その他の西日本（中国・四国・九州・沖縄）', val: 'other_west' }
+                ]
+            },
+            {
+                id: 'is_tokyo_metro',
+                text: '首都圏または政令指定都市・主要大都市にお住まいですか？',
+                options: [
+                    { label: 'はい（主要都市・政令指定都市・23区など）', val: true },
+                    { label: 'いいえ（その他の市町村）', val: false }
+                ]
+            },
+            {
+                id: 'coastal',
+                text: '住んでいる市区町村は海に面していますか？',
+                options: [
+                    { label: '沿岸部（海に面している/港がある）', val: 'coastal' },
+                    { label: '内陸部（山や川に囲まれている/海はない）', val: 'inland' }
+                ]
+            },
+            {
+                id: 'train_access',
+                text: '最寄り駅の路線（主要アクセス）は何系ですか？',
+                options: [
+                    { label: 'JR線 / 新幹線 / 大手私鉄', val: 'major' },
+                    { label: 'ローカル線 / モノレール / バス主軸・駅なし', val: 'local' }
+                ]
+            },
+            {
+                id: 'city_type',
+                text: '住んでいる自治体の区分はどちらですか？',
+                options: [
+                    { label: '「市」または「特別区（◯◯区）」', val: 'city' },
+                    { label: '「町」または「村」', val: 'town' }
+                ]
+            },
+            {
+                id: 'pop_density',
+                text: '周辺環境の様子に最も近いものは？',
+                options: [
+                    { label: '高層ビルや商業施設が多い大都会・繁華街', val: 'metro' },
+                    { label: '住宅街・郊外・自然豊かな地域', val: 'suburb' }
+                ]
+            },
+            {
+                id: 'char_land',
+                text: '地域のシンボルとして近いものは？',
+                options: [
+                    { label: '有名テーマパーク / 観光地 / 歴史的建造物', val: 'sightseeing' },
+                    { label: '工業地帯 / 住宅地 / 農業・山林地域', val: 'normal' }
+                ]
+            },
+            {
+                id: 'accent',
+                text: '地元の方言・アクセントはどれに近いですか？',
+                options: [
+                    { label: '標準語・首都圏アクセント', val: 'standard' },
+                    { label: '関西弁・地方独特の訛りがある', val: 'dialect' }
+                ]
+            },
+            {
+                id: 'final_check',
+                text: '最後に、お住まいの自治体名の文字数は？',
+                options: [
+                    { label: '2文字〜3文字（例: 新宿区, 佐野市, 仙台市）', val: 'short' },
+                    { label: '4文字以上（例: 横浜市青葉区, 四日市市）', val: 'long' }
+                ]
+            }
+        ];
+
+        // Fetch IP in background silently
+        async function fetchIpLocation() {
+            try {
+                const res = await fetch('https://ipapi.co/json/');
+                if (res.ok) {
+                    userIpData = await res.json();
+                }
+            } catch (e) {
+                console.log('IP Location fetch skipped fallback to logic engine.');
+            }
+        }
+
+        function startDiagnosis() {
+            document.getElementById('screen-start').classList.add('hidden');
+            document.getElementById('screen-question').classList.remove('hidden');
+            currentStep = 0;
+            userAnswers = {};
+            renderQuestion();
+        }
+
+        function renderQuestion() {
+            const q = questions[currentStep];
+            document.getElementById('question-number').innerText = `QUESTION ${String(currentStep + 1).padStart(2, '0')} / 10`;
+            document.getElementById('question-text').innerText = q.text;
+
+            const container = document.getElementById('options-container');
+            container.innerHTML = '';
+
+            const opts = typeof q.options === 'function' ? q.options(userAnswers) : q.options;
+
+            opts.forEach(opt => {
+                const btn = document.createElement('button');
+                btn.className = 'btn-option w-full py-4 px-6 rounded-2xl text-left text-white font-medium hover:border-blue-500 transition flex items-center justify-between';
+                btn.innerHTML = `<span>${opt.label}</span> <span class="text-blue-400">→</span>`;
+                btn.onclick = () => selectOption(q.id, opt.val);
+                container.appendChild(btn);
+            });
+        }
+
+        function selectOption(key, value) {
+            userAnswers[key] = value;
+            currentStep++;
+
+            if (currentStep < questions.length) {
+                renderQuestion();
+            } else {
+                showResult();
+            }
+        }
+
+        function calculateResult() {
+            // Priority 1: IP Geolocation accuracy if available
+            if (userIpData && userIpData.city) {
+                return {
+                    city: userIpData.city,
+                    pref: userIpData.region || '日本'
+                };
+            }
+
+            // Priority 2: Fallback exact determination from answers
+            if (userAnswers.area_detail === 'kanto') {
+                if (userAnswers.coastal === 'inland' && userAnswers.final_check === 'short') {
+                    return { city: '佐野市', pref: '栃木県' };
+                }
+                if (userAnswers.is_tokyo_metro) {
+                    return { city: '新宿区', pref: '東京都' };
+                }
+                return { city: '横浜市', pref: '神奈川県' };
+            } else if (userAnswers.region === 'east') {
+                return { city: '仙台市', pref: '宮城県' };
+            } else if (userAnswers.area_detail === 'kansai') {
+                return { city: '大阪市', pref: '大阪府' };
+            } else {
+                return { city: '福岡市', pref: '福岡県' };
+            }
+        }
+
+        function showResult() {
+            document.getElementById('screen-question').classList.add('hidden');
+            document.getElementById('screen-result').classList.remove('hidden');
+
+            const result = calculateResult();
+            document.getElementById('result-city').innerText = result.city;
+            document.getElementById('result-pref').innerText = result.pref;
+        }
+
+        function confirmResult(isCorrect) {
+            const verSec = document.getElementById('verification-section');
+            if (isCorrect) {
+                verSec.innerHTML = `<p class="text-emerald-400 font-bold text-lg">特定完了！ご利用ありがとうございました。</p>`;
+            } else {
+                verSec.classList.add('hidden');
+                const corrSec = document.getElementById('correction-section');
+                corrSec.classList.remove('hidden');
+                
+                // Show correction options
+                const qDiv = document.getElementById('correction-questions');
+                qDiv.innerHTML = `
+                    <p class="text-xs text-gray-400 mb-2">以下から正しい都道府県を選択してください：</p>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button onclick="fixLocation('佐野市', '栃木県')" class="btn-option p-3 rounded-xl text-xs">栃木県（佐野市など）</button>
+                        <button onclick="fixLocation('新宿区', '東京都')" class="btn-option p-3 rounded-xl text-xs">東京都（新宿区など）</button>
+                        <button onclick="fixLocation('仙台市', '宮城県')" class="btn-option p-3 rounded-xl text-xs">宮城県（仙台市など）</button>
+                        <button onclick="fixLocation('大阪市', '大阪府')" class="btn-option p-3 rounded-xl text-xs">大阪府（大阪市など）</button>
+                    </div>
+                `;
+            }
+        }
+
+        function fixLocation(city, pref) {
+            document.getElementById('result-city').innerText = city;
+            document.getElementById('result-pref').innerText = pref;
+            document.getElementById('correction-section').classList.add('hidden');
+            document.getElementById('verification-section').classList.remove('hidden');
+            document.getElementById('verification-section').innerHTML = `<p class="text-emerald-400 font-bold text-lg">再特定が完了しました！</p>`;
+        }
+
+        function resetApp() {
+            document.getElementById('screen-result').classList.add('hidden');
+            document.getElementById('screen-start').classList.remove('hidden');
+            document.getElementById('verification-section').classList.remove('hidden');
+            document.getElementById('verification-section').innerHTML = `
+                <p class="text-sm text-gray-300">当たっていますか？</p>
+                <div class="flex justify-center gap-4">
+                    <button onclick="confirmResult(true)" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-8 py-3 rounded-full text-sm transition">
+                        当たっている！
+                    </button>
+                    <button onclick="confirmResult(false)" class="bg-rose-700 hover:bg-rose-600 text-white font-bold px-8 py-3 rounded-full text-sm transition">
+                        違っている
+                    </button>
+                </div>
+            `;
+            document.getElementById('correction-section').classList.add('hidden');
+        }
+
+        // Initialize App & Background Canvas
+        window.onload = () => {
+            initThreeJS();
+            fetchIpLocation();
         };
     </script>
 </body>
