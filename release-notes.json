@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-11-04",
+  "apps": {
+    "ichiate": {
+      "title": "位置をあてます！",
+      "editUrl": "https://github.com/knotspace/ichiate/edit/main/release-notes.json",
+      "notes": [
+        {
+          "date": "2026-11-04",
+          "version": "v1.0.0",
+          "type": "feature",
+          "audience": "all",
+          "title": "画面内リリースノートを追加",
+          "description": "このサイトの更新内容をページ内から確認できるようになりました。"
+        },
+        {
+          "date": "2026-11-04",
+          "version": "v1.0.0-dev",
+          "type": "developer",
+          "audience": "developer",
+          "title": "独立した更新データを追加",
+          "description": "このサイトの変更は release-notes.json に記録します。",
+          "path": "release-notes.json"
+        }
+      ]
+    }
+  }
+}
