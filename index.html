@@ -515,10 +515,17 @@
             document.getElementById('correction-section').classList.add('hidden');
         }
 
-        window.onload = () => {
-            initThreeJS();
+        document.addEventListener('DOMContentLoaded', () => {
             fetchIpLocation();
-        };
+            const startBackground = () => {
+                try { initThreeJS(); } catch (error) { console.warn('3D背景を読み込めませんでした。', error); }
+            };
+            if ('requestIdleCallback' in window) {
+                requestIdleCallback(startBackground, { timeout: 1200 });
+            } else {
+                setTimeout(startBackground, 250);
+            }
+        });
     </script>
 <script src="release-notes.js" defer></script>
 
