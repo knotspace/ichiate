@@ -3,16 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>位置をあてます！</title>
-    <!-- Three.js (軽量3Dアース描画) -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <meta name="description" content="質問に答えて現在地の市区町村を推定する位置当てゲーム。結果の確認や手動修正にも対応しています。">
+    <meta name="theme-color" content="#0b0f19">
+    <link rel="canonical" href="https://knotspace.github.io/ichiate/">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="位置をあてます！｜位置当てゲーム">
+    <meta property="og:description" content="質問に答えて現在地の市区町村を推定する位置当てゲーム。">
+    <meta property="og:url" content="https://knotspace.github.io/ichiate/">
+    <meta name="twitter:card" content="summary">
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+    <link rel="preconnect" href="https://cdn.tailwindcss.com" crossorigin>
+    <!-- Defer non-critical libraries until HTML parsing is complete. -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" defer></script>
+    <script src="https://cdn.tailwindcss.com" defer></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700;900&display=swap');
+        
         
         body {
-            font-family: 'Noto Sans JP', sans-serif;
+            font-family: system-ui, -apple-system, 'Yu Gothic', Meiryo, sans-serif;
             background-color: #0b0f19;
             color: #ffffff;
             overflow-x: hidden;
