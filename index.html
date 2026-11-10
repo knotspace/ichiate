@@ -133,6 +133,20 @@
                 </div>
             </div>
 
+            <section id="ip-details" class="rounded-2xl border border-gray-700 bg-gray-900/60 p-5 text-left space-y-3">
+                <h4 class="text-sm font-bold text-blue-300">IPアドレスから取得した参考情報</h4>
+                <p id="ip-status" class="text-sm text-gray-300">取得状況を確認中...</p>
+                <dl id="ip-fields" class="hidden grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-3 text-sm">
+                    <div><dt class="text-gray-500">IPアドレス</dt><dd id="ip-value" class="break-all text-gray-200">—</dd></div>
+                    <div><dt class="text-gray-500">IP推定地域</dt><dd id="ip-place" class="text-gray-200">—</dd></div>
+                    <div><dt class="text-gray-500">国</dt><dd id="ip-country" class="text-gray-200">—</dd></div>
+                    <div><dt class="text-gray-500">プロバイダ・組織</dt><dd id="ip-org" class="break-words text-gray-200">—</dd></div>
+                    <div><dt class="text-gray-500">ASN</dt><dd id="ip-asn" class="text-gray-200">—</dd></div>
+                    <div><dt class="text-gray-500">位置精度</dt><dd class="text-gray-200">精度半径はAPIから提供されていません</dd></div>
+                </dl>
+                <p class="text-xs leading-relaxed text-gray-500">IP推定地域は通信事業者の出口設備などを示す場合があり、実際の現在地とは異なることがあります。GPS位置情報ではありません。市区町村や住所を特定できる精度は保証されません。取得元：ipapi.co ／ <span id="ip-checked-at">確認時刻：—</span></p>
+            </section>
+
             <!-- Verification section -->
             <div id="verification-section" class="space-y-4">
                 <p class="text-sm text-gray-300">当たっていますか？</p>
@@ -282,6 +296,8 @@
 
         // --- Question Engine ---
         let userIpData = null;
+        let ipFetchPromise = null;
+        let ipFetchStatus = 'pending';
         let currentStep = 0;
         let userAnswers = {};
 
@@ -381,16 +397,48 @@
         ];
 
         async function fetchIpLocation() {
+            userIpData = null;
+            ipFetchStatus = 'pending';
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 8000);
             try {
-                const res = await fetch('https://ipapi.co/json/');
-                if (res.ok) userIpData = await res.json();
+                const res = await fetch('https://ipapi.co/json/', { signal: controller.signal, cache: 'no-store' });
+                if (!res.ok) throw new Error('IP情報サービスから応答がありません');
+                const data = await res.json();
+                if (data.error || !data.ip) throw new Error('IP情報を取得できませんでした');
+                userIpData = data;
+                ipFetchStatus = 'success';
             } catch (e) {
-                console.log('IP fetch skipped.');
+                ipFetchStatus = 'error';
+                console.warn('IP location lookup unavailable:', e);
+            } finally {
+                clearTimeout(timeout);
             }
         }
 
+        function renderIpDetails() {
+            const status = document.getElementById('ip-status');
+            const fields = document.getElementById('ip-fields');
+            const checkedAt = document.getElementById('ip-checked-at');
+            checkedAt.textContent = '確認時刻：' + new Date().toLocaleString('ja-JP');
+            if (!userIpData) {
+                fields.classList.add('hidden');
+                status.textContent = 'IP情報を取得できませんでした。回答内容に基づく推定結果のみ表示しています。';
+                return;
+            }
+            const country = userIpData.country_name || userIpData.country_code || '不明';
+            const place = [userIpData.region, userIpData.city].filter(Boolean).join('・') || '地域情報なし';
+            document.getElementById('ip-value').textContent = userIpData.ip || '不明';
+            document.getElementById('ip-place').textContent = place;
+            document.getElementById('ip-country').textContent = country;
+            document.getElementById('ip-org').textContent = userIpData.org || '提供なし';
+            document.getElementById('ip-asn').textContent = userIpData.asn || '提供なし';
+            fields.classList.remove('hidden');
+            status.textContent = 'IP情報サービスから取得しました。これは通信元IPに基づく概算情報です。';
+        }
+
         function startDiagnosis() {
-            fetchIpLocation();
+            ipFetchPromise = fetchIpLocation();
             document.getElementById('screen-start').classList.add('hidden');
             document.getElementById('screen-question').classList.remove('hidden');
             currentStep = 0;
@@ -429,12 +477,8 @@
         }
 
         function calculateResult() {
-            // Priority 1: IP Geolocation matches
-            if (userIpData && userIpData.city) {
-                return { city: userIpData.city, pref: userIpData.region || '日本' };
-            }
-
-            // Priority 2: Full Database Tree Match
+            // IP情報は通信経路上の出口設備を示す場合があるため、回答結果を上書きしない。
+            // 回答内容を優先し、IP推定値は別枠の参考情報として表示する。
             const prefKey = userAnswers.pref_select;
             const regionKey = userAnswers.region;
             const subRegionKey = userAnswers.sub_region;
@@ -468,7 +512,9 @@
             return names[key] || '日本';
         }
 
-        function showResult() {
+        async function showResult() {
+            if (ipFetchPromise) await ipFetchPromise;
+            renderIpDetails();
             document.getElementById('screen-question').classList.add('hidden');
             document.getElementById('screen-result').classList.remove('hidden');
 
