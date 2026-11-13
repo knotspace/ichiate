@@ -1,11 +1,19 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-11-05",
+  "updatedAt": "2026-11-13",
   "apps": {
     "ichiate": {
       "title": "位置をあてます！",
       "editUrl": "https://github.com/knotspace/ichiate/edit/main/release-notes.json",
       "notes": [
+        {
+          "date": "2026-11-13",
+          "version": "v1.0.2",
+          "type": "improvement",
+          "audience": "all",
+          "title": "ページタイトルと検索表示を改善",
+          "description": "ブラウザーのタブ・支援技術・検索結果でページの内容が分かるよう、文書タイトルを追加しました。"
+        },
         {
           "date": "2026-11-05",
           "version": "v1.0.1",
